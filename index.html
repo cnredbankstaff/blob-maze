@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blob Maze Adventure</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-family:'Fredoka',sans-serif; background:#0a0a1a; }
+canvas { display:block; width:100%; height:100%; }
+#ui-overlay { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10; }
+#ui-overlay > * { pointer-events:auto; }
+.screen-overlay { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+.skin-btn { width:90px; height:90px; border-radius:50%; border:4px solid rgba(255,255,255,0.3); cursor:pointer; transition:all 0.3s; position:relative; }
+.skin-btn:hover { transform:scale(1.15); border-color:#fff; }
+.skin-btn.selected { border-color:#ffd700; box-shadow:0 0 20px rgba(255,215,0,0.5); }
+.glass { background:rgba(15,15,40,0.85); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); border-radius:16px; }
+.btn-play { background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; border:none; padding:14px 48px; border-radius:50px; font-size:20px; font-family:'Fredoka'; font-weight:700; cursor:pointer; transition:all 0.3s; letter-spacing:1px; }
+.btn-play:hover { transform:scale(1.05); box-shadow:0 0 30px rgba(139,92,246,0.5); }
+#hud { position:absolute; top:16px; left:16px; right:16px; display:flex; justify-content:space-between; align-items:flex-start; }
+.hud-box { background:rgba(15,15,40,0.7); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 16px; color:#e2e8f0; font-size:14px; }
+.restart-btn { background:rgba(239,68,68,0.3); border:1px solid rgba(239,68,68,0.5); color:#fca5a5; padding:6px 14px; border-radius:8px; cursor:pointer; font-family:'Fredoka'; font-size:13px; transition:all 0.2s; }
+.restart-btn:hover { background:rgba(239,68,68,0.5); }
+.controls-hint { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.4); font-size:12px; }
+@keyframes floatIn { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+.float-in { animation: floatIn 0.6s ease-out; }
+@keyframes pulse { 0%,100% { opacity:0.6; } 50% { opacity:1; } }
+.pulse { animation: pulse 2s infinite; }
+</style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="ui-overlay">
+   <!-- Title Screen -->
+   <div id="title-screen" class="screen-overlay" style="background:radial-gradient(ellipse at center, rgba(30,20,60,0.9) 0%, rgba(10,10,26,0.97) 100%);">
+    <div class="text-center float-in">
+     <div style="font-size:52px; font-weight:700; background:linear-gradient(135deg,#818cf8,#c084fc,#67e8f9); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:8px;" id="title-text">
+      Blob Maze Adventure
+     </div>
+     <p style="color:#94a3b8; font-size:16px; margin-bottom:36px;">Navigate the sky mazes. Find the exit. Earn your wings.</p>
+     <p style="color:#c4b5fd; font-size:15px; margin-bottom:16px; font-weight:600;">Choose your blob:</p>
+     <div style="display:flex; gap:24px; justify-content:center; margin-bottom:32px;">
+      <div>
+       <div class="skin-btn selected" data-skin="blue" style="background:radial-gradient(circle at 35% 35%,#93c5fd,#3b82f6,#1e40af);" onclick="selectSkin('blue',this)"></div>
+       <div style="color:#93c5fd; font-size:12px; margin-top:6px; text-align:center;">
+        Azure
+       </div>
+      </div>
+      <div>
+       <div class="skin-btn" data-skin="purple" style="background:radial-gradient(circle at 35% 35%,#d8b4fe,#a855f7,#7e22ce);" onclick="selectSkin('purple',this)"></div>
+       <div style="color:#d8b4fe; font-size:12px; margin-top:6px; text-align:center;">
+        Amethyst
+       </div>
+      </div>
+      <div>
+       <div class="skin-btn" data-skin="green" style="background:radial-gradient(circle at 35% 35%,#86efac,#22c55e,#15803d);" onclick="selectSkin('green',this)"></div>
+       <div style="color:#86efac; font-size:12px; margin-top:6px; text-align:center;">
+        Emerald
+       </div>
+      </div>
+     </div><button class="btn-play" onclick="startGame()">PLAY</button>
+    </div>
+   </div><!-- HUD -->
+   <div id="hud" style="display:none;">
+    <div class="hud-box">
+     <span style="color:#a78bfa;">Level</span> <span id="level-num" style="color:#e2e8f0; font-weight:700;">1</span><span style="color:#475569;">/3</span>
+    </div>
+    <div style="display:flex; gap:8px;">
+     <button class="restart-btn" onclick="restartLevel()">↺ Restart</button>
+    </div>
+   </div>
+   <div class="controls-hint" id="controls-hint" style="display:none;">
+    WASD to move
+   </div><!-- Level Transition -->
+   <div id="level-transition" class="screen-overlay" style="display:none; background:rgba(10,10,26,0.95);">
+    <div class="text-center float-in">
+     <div style="font-size:36px; font-weight:700; color:#c084fc;" id="transition-title">
+      Level Complete!
+     </div>
+     <p style="color:#94a3b8; margin:12px 0 24px;" id="transition-sub">Get ready for the next challenge...</p><button class="btn-play" onclick="continueToNext()">Continue</button>
+    </div>
+   </div><!-- Win Screen -->
+   <div id="win-screen" class="screen-overlay" style="display:none; background:radial-gradient(ellipse at center, rgba(20,40,20,0.9) 0%, rgba(10,10,26,0.97) 100%);">
+    <div class="text-center float-in">
+     <div style="font-size:44px;">
+      ✨🦋✨
+     </div>
+     <div style="font-size:36px; font-weight:700; background:linear-gradient(135deg,#86efac,#67e8f9,#c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin:12px 0;">
+      You Earned Your Wings!
+     </div>
+     <p style="color:#94a3b8; margin-bottom:24px;">Explore the Enchanted Forest</p><button class="btn-play" style="background:linear-gradient(135deg,#22c55e,#06b6d4);" onclick="enterForest()">Enter Forest</button>
+    </div>
+   </div>
+  </div>
+  <script>
+// ===== ELEMENT SDK =====
+const defaultConfig = {
+  game_title: 'Blob Maze Adventure',
+  background_color: '#0a0a1a',
+  surface_color: '#1e1b4b',
+  text_color: '#e2e8f0',
+  primary_action_color: '#a855f7',
+  secondary_action_color: '#6366f1',
+  font_family: 'Fredoka',
+  font_size: 16
+};
+
+function applyConfig(config) {
+  const t = config.game_title || defaultConfig.game_title;
+  const el = document.getElementById('title-text');
+  if (el) el.textContent = t;
+  document.body.style.fontFamily = `${config.font_family || defaultConfig.font_family}, sans-serif`;
+}
+
+window.elementSdk.init({
+  defaultConfig,
+  onConfigChange: async (config) => { applyConfig(config); },
+  mapToCapabilities: (config) => ({
+    recolorables: [
+      { get: () => config.background_color || defaultConfig.background_color, set: v => { config.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
+      { get: () => config.surface_color || defaultConfig.surface_color, set: v => { config.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
+      { get: () => config.text_color || defaultConfig.text_color, set: v => { config.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
+      { get: () => config.primary_action_color || defaultConfig.primary_action_color, set: v => { config.primary_action_color = v; window.elementSdk.setConfig({ primary_action_color: v }); } },
+      { get: () => config.secondary_action_color || defaultConfig.secondary_action_color, set: v => { config.secondary_action_color = v; window.elementSdk.setConfig({ secondary_action_color: v }); } }
+    ],
+    borderables: [],
+    fontEditable: { get: () => config.font_family || defaultConfig.font_family, set: v => { config.font_family = v; window.elementSdk.setConfig({ font_family: v }); } },
+    fontSizeable: { get: () => config.font_size || defaultConfig.font_size, set: v => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); } }
+  }),
+  mapToEditPanelValues: (config) => new Map([
+    ['game_title', config.game_title || defaultConfig.game_title]
+  ])
+});
+
+// ===== WEB AUDIO =====
+let audioCtx = null;
+function ensureAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+
+function playTone(freq, dur, type='sine', vol=0.08) {
+  try {
+    const ctx = ensureAudio();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+
+function playCollect() { playTone(523, 0.15); setTimeout(() => playTone(659, 0.15), 100); setTimeout(() => playTone(784, 0.2), 200); }
+function playHit() { playTone(150, 0.3, 'sawtooth', 0.06); }
+function playWin() { [523,659,784,1047].forEach((f,i) => setTimeout(() => playTone(f, 0.3, 'sine', 0.07), i*150)); }
+function playAmbient() {
+  if (!audioCtx) return;
+  try {
+    const ctx = audioCtx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 120;
+    gain.gain.value = 0.015;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    setTimeout(() => { gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1); osc.stop(ctx.currentTime + 1); }, 3000);
+  } catch(e) {}
+}
+
+// ===== GAME ENGINE =====
+const canvas = document.getElementById('gameCanvas');
+const gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+
+let selectedSkin = 'blue';
+let currentLevel = 0;
+let gameState = 'title'; // title, playing, transition, win, forest
+let playerPos = { x: 0, y: 0.5, z: 0 };
+let playerVel = { x: 0, y: 0, z: 0 };
+let playerAngle = 0;
+let cameraPos = { x: 0, y: 3, z: 5 };
+let cameraTarget = { x: 0, y: 0, z: 0 };
+let keys = {};
+let bobTime = 0;
+let levelData = null;
+let monsters = [];
+let movingWalls = [];
+let particles = [];
+let exitPos = { x: 0, y: 0, z: 0 };
+let exitFound = false;
+let hasWings = false;
+let lastTime = 0;
+let forestParticles = [];
+
+const CELL = 2.0;
+const WALL_H = 2.5;
+
+const skinColors = {
+  blue: [0.23, 0.51, 0.96],
+  purple: [0.66, 0.33, 0.97],
+  green: [0.13, 0.77, 0.37]
+};
+const skinHighlight = {
+  blue: [0.58, 0.77, 0.99],
+  purple: [0.85, 0.71, 1.0],
+  green: [0.53, 0.94, 0.67]
+};
+
+function selectSkin(skin, el) {
+  selectedSkin = skin;
+  document.querySelectorAll('.skin-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function startGame() {
+  ensureAudio();
+  document.getElementById('title-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('controls-hint').style.display = 'block';
+  currentLevel = 0;
+  loadLevel(0);
+  gameState = 'playing';
+  playAmbient();
+}
+
+function restartLevel() {
+  loadLevel(currentLevel);
+  gameState = 'playing';
+}
+
+function continueToNext() {
+  document.getElementById('level-transition').style.display = 'none';
+  currentLevel++;
+  if (currentLevel >= 3) {
+    gameState = 'win';
+    document.getElementById('win-screen').style.display = 'flex';
+    playWin();
+  } else {
+    loadLevel(currentLevel);
+    gameState = 'playing';
+    document.getElementById('level-num').textContent = currentLevel + 1;
+    playAmbient();
+  }
+}
+
+function enterForest() {
+  document.getElementById('win-screen').style.display = 'none';
+  hasWings = true;
+  gameState = 'forest';
+  loadForest();
+  playWin();
+}
+
+// ===== MAZE GENERATION =====
+const levels = [
+  // Level 1: 10x10 simple
+  { w: 10, h: 10, monsterCount: 2, monsterSpeed: 0.8, fogDensity: 0.03, wallShifts: 2, ambientLight: 0.25 },
+  // Level 2: 14x14 medium
+  { w: 14, h: 14, monsterCount: 4, monsterSpeed: 1.2, fogDensity: 0.05, wallShifts: 5, ambientLight: 0.15 },
+  // Level 3: 18x18 hard
+  { w: 18, h: 18, monsterCount: 7, monsterSpeed: 1.6, fogDensity: 0.07, wallShifts: 8, ambientLight: 0.08 }
+];
+
+function generateMaze(w, h) {
+  // Grid: 0=wall, 1=path
+  const grid = Array.from({ length: h * 2 + 1 }, () => Array(w * 2 + 1).fill(0));
+  const visited = Array.from({ length: h }, () => Array(w).fill(false));
+  const stack = [];
+  
+  function carve(cx, cy) {
+    visited[cy][cx] = true;
+    grid[cy * 2 + 1][cx * 2 + 1] = 1;
+    const dirs = [[0,-1],[0,1],[-1,0],[1,0]].sort(() => Math.random() - 0.5);
+    for (const [dx, dy] of dirs) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx >= 0 && nx < w && ny >= 0 && ny < h && !visited[ny][nx]) {
+        grid[cy * 2 + 1 + dy][cx * 2 + 1 + dx] = 1;
+        carve(nx, ny);
+      }
+    }
+  }
+  carve(0, 0);
+  
+  // Open some extra passages for more open feel on level 1
+  const extraPaths = w * h * (currentLevel === 0 ? 0.15 : currentLevel === 1 ? 0.08 : 0.04);
+  for (let i = 0; i < extraPaths; i++) {
+    const rx = 1 + Math.floor(Math.random() * (w * 2 - 1));
+    const ry = 1 + Math.floor(Math.random() * (h * 2 - 1));
+    if (grid[ry] && grid[ry][rx] === 0) {
+      // Check if adjacent to path
+      let adj = 0;
+      if (ry > 0 && grid[ry-1][rx]) adj++;
+      if (ry < h*2 && grid[ry+1][rx]) adj++;
+      if (rx > 0 && grid[ry][rx-1]) adj++;
+      if (rx < w*2 && grid[ry][rx+1]) adj++;
+      if (adj >= 2) grid[ry][rx] = 1;
+    }
+  }
+  
+  return grid;
+}
+
+function loadLevel(lvl) {
+  const cfg = levels[lvl];
+  const grid = generateMaze(cfg.w, cfg.h);
+  const gw = grid[0].length;
+  const gh = grid.length;
+  
+  // Build wall list
+  const walls = [];
+  for (let y = 0; y < gh; y++) {
+    for (let x = 0; x < gw; x++) {
+      if (grid[y][x] === 0) {
+        walls.push({ x: x * CELL, z: y * CELL, moving: false });
+      }
+    }
+  }
+  
+  // Make some walls moving
+  movingWalls = [];
+  const wallCandidates = walls.filter(w => {
+    const gx = Math.round(w.x / CELL);
+    const gz = Math.round(w.z / CELL);
+    return gx > 1 && gx < gw - 2 && gz > 1 && gz < gh - 2;
+  });
+  for (let i = 0; i < Math.min(cfg.wallShifts, wallCandidates.length); i++) {
+    const idx = Math.floor(Math.random() * wallCandidates.length);
+    const mw = wallCandidates.splice(idx, 1)[0];
+    mw.moving = true;
+    mw.origX = mw.x;
+    mw.origZ = mw.z;
+    mw.phase = Math.random() * Math.PI * 2;
+    mw.dir = Math.random() > 0.5 ? 'x' : 'z';
+    mw.amplitude = CELL * 0.8;
+    movingWalls.push(mw);
+  }
+  
+  // Player start (top-left open cell)
+  playerPos = { x: 1 * CELL, y: 0.5, z: 1 * CELL };
+  playerVel = { x: 0, y: 0, z: 0 };
+  playerAngle = 0;
+  
+  // Exit position (bottom-right)
+  exitPos = { x: (gw - 2) * CELL, y: 0, z: (gh - 2) * CELL };
+  exitFound = lvl < 2; // Level 3: hidden until close
+  
+  // Monsters
+  monsters = [];
+  for (let i = 0; i < cfg.monsterCount; i++) {
+    let mx, mz;
+    do {
+      mx = (1 + Math.floor(Math.random() * (gw - 2))) * CELL;
+      mz = (1 + Math.floor(Math.random() * (gh - 2))) * CELL;
+    } while (Math.hypot(mx - playerPos.x, mz - playerPos.z) < 8);
+    
+    monsters.push({
+      x: mx, z: mz, y: 0.4,
+      vx: (Math.random() - 0.5) * cfg.monsterSpeed,
+      vz: (Math.random() - 0.5) * cfg.monsterSpeed,
+      speed: cfg.monsterSpeed,
+      chasing: false,
+      patrolTimer: 0,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+  
+  // Particles
+  particles = [];
+  for (let i = 0; i < 30; i++) {
+    particles.push({
+      x: Math.random() * gw * CELL,
+      y: 0.5 + Math.random() * 3,
+      z: Math.random() * gh * CELL,
+      speed: 0.1 + Math.random() * 0.2,
+      phase: Math.random() * Math.PI * 2,
+      size: 0.03 + Math.random() * 0.05
+    });
+  }
+  
+  levelData = { grid, walls, cfg, gw, gh };
+}
+
+function loadForest() {
+  playerPos = { x: 0, y: 1, z: 0 };
+  playerVel = { x: 0, y: 0, z: 0 };
+  playerAngle = 0;
+  forestParticles = [];
+  for (let i = 0; i < 80; i++) {
+    forestParticles.push({
+      x: (Math.random() - 0.5) * 40,
+      y: Math.random() * 6,
+      z: (Math.random() - 0.5) * 40,
+      speed: 0.05 + Math.random() * 0.15,
+      phase: Math.random() * Math.PI * 2,
+      size: 0.04 + Math.random() * 0.08,
+      color: [Math.random() * 0.3 + 0.3, Math.random() * 0.4 + 0.6, Math.random() * 0.3 + 0.3]
+    });
+  }
+}
+
+// ===== WEBGL SHADERS =====
+const vsSource = `
+attribute vec3 aPos;
+attribute vec3 aNorm;
+attribute vec3 aColor;
+uniform mat4 uProj;
+uniform mat4 uView;
+uniform mat4 uModel;
+uniform vec3 uPlayerPos;
+uniform float uAmbient;
+uniform float uFogDensity;
+uniform vec3 uTorchColor;
+varying vec3 vColor;
+varying float vFog;
+varying vec3 vWorldPos;
+varying vec3 vNorm;
+void main() {
+  vec4 worldPos = uModel * vec4(aPos, 1.0);
+  vWorldPos = worldPos.xyz;
+  vNorm = mat3(uModel) * aNorm;
+  gl_Position = uProj * uView * worldPos;
+  
+  float dist = length(worldPos.xyz - uPlayerPos);
+  float torchLight = max(0.0, 1.0 - dist / 12.0);
+  torchLight = torchLight * torchLight;
+  
+  vec3 lightDir = normalize(uPlayerPos - worldPos.xyz);
+  float diff = max(dot(normalize(vNorm), lightDir), 0.0);
+  
+  vec3 lit = aColor * (uAmbient + torchLight * (0.6 + diff * 0.4) * uTorchColor);
+  vColor = lit;
+  
+  vFog = 1.0 - exp(-uFogDensity * dist * dist);
+}
+`;
+
+const fsSource = `
+precision mediump float;
+varying vec3 vColor;
+varying float vFog;
+uniform vec3 uFogColor;
+void main() {
+  vec3 col = mix(vColor, uFogColor, clamp(vFog, 0.0, 1.0));
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function createShader(type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  return s;
+}
+
+function createProgram(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, createShader(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, createShader(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+
+const prog = createProgram(vsSource, fsSource);
+const uProj = gl.getUniformLocation(prog, 'uProj');
+const uView = gl.getUniformLocation(prog, 'uView');
+const uModel = gl.getUniformLocation(prog, 'uModel');
+const uPlayerPos = gl.getUniformLocation(prog, 'uPlayerPos');
+const uAmbient = gl.getUniformLocation(prog, 'uAmbient');
+const uFogDensity = gl.getUniformLocation(prog, 'uFogDensity');
+const uFogColor = gl.getUniformLocation(prog, 'uFogColor');
+const uTorchColor = gl.getUniformLocation(prog, 'uTorchColor');
+const aPos = gl.getAttribLocation(prog, 'aPos');
+const aNorm = gl.getAttribLocation(prog, 'aNorm');
+const aColor = gl.getAttribLocation(prog, 'aColor');
+
+gl.useProgram(prog);
+gl.enable(gl.DEPTH_TEST);
+gl.enable(gl.CULL_FACE);
+
+// ===== GEOMETRY HELPERS =====
+function createBuffer(data) {
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+  return buf;
+}
+
+function makeBox(sx, sy, sz, r, g, b) {
+  const x = sx/2, y = sy/2, z = sz/2;
+  const verts = [];
+  // Each face: 2 triangles, each vertex has pos(3) + norm(3) + color(3)
+  function face(p1,p2,p3,p4,n) {
+    for (const p of [p1,p2,p3,p1,p3,p4]) {
+      verts.push(...p, ...n, r, g, b);
+    }
+  }
+  // Front
+  face([-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z],[0,0,1]);
+  // Back
+  face([x,-y,-z],[-x,-y,-z],[-x,y,-z],[x,y,-z],[0,0,-1]);
+  // Top
+  face([-x,y,z],[x,y,z],[x,y,-z],[-x,y,-z],[0,1,0]);
+  // Bottom
+  face([-x,-y,-z],[x,-y,-z],[x,-y,z],[-x,-y,z],[0,-1,0]);
+  // Right
+  face([x,-y,z],[x,-y,-z],[x,y,-z],[x,y,z],[1,0,0]);
+  // Left
+  face([-x,-y,-z],[-x,-y,z],[-x,y,z],[-x,y,-z],[-1,0,0]);
+  return { buf: createBuffer(verts), count: 36 };
+}
+
+function makeSphere(radius, segs, r, g, b) {
+  const verts = [];
+  for (let lat = 0; lat < segs; lat++) {
+    for (let lon = 0; lon < segs; lon++) {
+      const t1 = lat / segs * Math.PI, t2 = (lat+1) / segs * Math.PI;
+      const p1 = lon / segs * Math.PI * 2, p2 = (lon+1) / segs * Math.PI * 2;
+      
+      function vert(t, p) {
+        const nx = Math.sin(t) * Math.cos(p);
+        const ny = Math.cos(t);
+        const nz = Math.sin(t) * Math.sin(p);
+        return [nx*radius, ny*radius, nz*radius, nx, ny, nz, r, g, b];
+      }
+      
+      const v1 = vert(t1,p1), v2 = vert(t2,p1), v3 = vert(t2,p2), v4 = vert(t1,p2);
+      verts.push(...v1,...v2,...v3,...v1,...v3,...v4);
+    }
+  }
+  return { buf: createBuffer(verts), count: segs * segs * 6 };
+}
+
+// Pre-built meshes
+const wallMesh = makeBox(CELL, WALL_H, CELL, 0.35, 0.3, 0.5);
+const wallMeshDark = makeBox(CELL, WALL_H, CELL, 0.2, 0.18, 0.35);
+const floorTile = makeBox(CELL, 0.15, CELL, 0.15, 0.12, 0.22);
+const exitMesh = makeSphere(0.5, 10, 1.0, 0.85, 0.3);
+const monsterMesh = makeSphere(0.4, 8, 0.85, 0.15, 0.15);
+const particleMesh = makeSphere(0.05, 4, 1.0, 1.0, 0.7);
+const treeTrunk = makeBox(0.3, 2, 0.3, 0.4, 0.25, 0.15);
+const treeLeaves = makeSphere(1.2, 8, 0.2, 0.65, 0.25);
+const glowPlant = makeSphere(0.3, 6, 0.3, 0.9, 0.5);
+
+// ===== MATRIX MATH =====
+function mat4Perspective(fov, aspect, near, far) {
+  const f = 1.0 / Math.tan(fov / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect,0,0,0,
+    0,f,0,0,
+    0,0,(far+near)*nf,-1,
+    0,0,2*far*near*nf,0
+  ]);
+}
+
+function mat4LookAt(eye, center, up) {
+  const zx=eye[0]-center[0], zy=eye[1]-center[1], zz=eye[2]-center[2];
+  let len = 1/Math.sqrt(zx*zx+zy*zy+zz*zz);
+  const fz=[zx*len,zy*len,zz*len];
+  const sx=up[1]*fz[2]-up[2]*fz[1], sy=up[2]*fz[0]-up[0]*fz[2], sz=up[0]*fz[1]-up[1]*fz[0];
+  len=1/Math.sqrt(sx*sx+sy*sy+sz*sz);
+  const s=[sx*len,sy*len,sz*len];
+  const u=[s[1]*fz[2]-s[2]*fz[1],s[2]*fz[0]-s[0]*fz[2],s[0]*fz[1]-s[1]*fz[0]];
+  return new Float32Array([
+    s[0],u[0],fz[0],0,
+    s[1],u[1],fz[1],0,
+    s[2],u[2],fz[2],0,
+    -(s[0]*eye[0]+s[1]*eye[1]+s[2]*eye[2]),
+    -(u[0]*eye[0]+u[1]*eye[1]+u[2]*eye[2]),
+    -(fz[0]*eye[0]+fz[1]*eye[1]+fz[2]*eye[2]),
+    1
+  ]);
+}
+
+function mat4Translate(x, y, z) {
+  return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1]);
+}
+
+function mat4Scale(x, y, z) {
+  return new Float32Array([x,0,0,0,0,y,0,0,0,0,z,0,0,0,0,1]);
+}
+
+function mat4Mul(a, b) {
+  const o = new Float32Array(16);
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++) {
+      o[j*4+i] = a[i]*b[j*4]+a[4+i]*b[j*4+1]+a[8+i]*b[j*4+2]+a[12+i]*b[j*4+3];
+    }
+  return o;
+}
+
+// ===== DRAWING =====
+function drawMesh(mesh, model) {
+  gl.uniformMatrix4fv(uModel, false, model);
+  gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
+  const stride = 9 * 4;
+  gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, stride, 0);
+  gl.vertexAttribPointer(aNorm, 3, gl.FLOAT, false, stride, 12);
+  gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, stride, 24);
+  gl.enableVertexAttribArray(aPos);
+  gl.enableVertexAttribArray(aNorm);
+  gl.enableVertexAttribArray(aColor);
+  gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+}
+
+// ===== PLAYER BLOB MESH (built dynamically for squish) =====
+function makeBlobMesh(squish) {
+  const c = skinColors[selectedSkin];
+  const h = skinHighlight[selectedSkin];
+  // Squished sphere
+  const sy = 1.0 - squish * 0.2;
+  const sx = 1.0 + squish * 0.1;
+  const verts = [];
+  const segs = 10;
+  const radius = 0.45;
+  for (let lat = 0; lat < segs; lat++) {
+    for (let lon = 0; lon < segs; lon++) {
+      const t1 = lat/segs*Math.PI, t2 = (lat+1)/segs*Math.PI;
+      const p1 = lon/segs*Math.PI*2, p2 = (lon+1)/segs*Math.PI*2;
+      function vert(t, p) {
+        const nx = Math.sin(t)*Math.cos(p);
+        const ny = Math.cos(t);
+        const nz = Math.sin(t)*Math.sin(p);
+        const blend = Math.max(0, ny) * 0.3;
+        const cr = c[0]*(1-blend) + h[0]*blend;
+        const cg = c[1]*(1-blend) + h[1]*blend;
+        const cb = c[2]*(1-blend) + h[2]*blend;
+        return [nx*radius*sx, ny*radius*sy, nz*radius*sx, nx, ny, nz, cr, cg, cb];
+      }
+      const v1=vert(t1,p1), v2=vert(t2,p1), v3=vert(t2,p2), v4=vert(t1,p2);
+      verts.push(...v1,...v2,...v3,...v1,...v3,...v4);
+    }
+  }
+  return { buf: createBuffer(verts), count: segs*segs*6 };
+}
+
+// Torch glow mesh
+const torchMesh = makeSphere(0.08, 6, 1.0, 0.9, 0.4);
+const torchStick = makeBox(0.04, 0.4, 0.04, 0.45, 0.3, 0.15);
+
+// ===== COLLISION =====
+function isWall(wx, wz) {
+  if (!levelData) return false;
+  const gx = Math.round(wx / CELL);
+  const gz = Math.round(wz / CELL);
+  if (gx < 0 || gz < 0 || gz >= levelData.gh || gx >= levelData.gw) return true;
+  if (levelData.grid[gz][gx] === 0) return true;
+  // Check moving walls
+  for (const mw of movingWalls) {
+    const dx = Math.abs(wx - mw.x);
+    const dz = Math.abs(wz - mw.z);
+    if (dx < CELL * 0.8 && dz < CELL * 0.8) return true;
+  }
+  return false;
+}
+
+// ===== UPDATE =====
+function update(dt) {
+  if (gameState !== 'playing' && gameState !== 'forest') return;
+  
+  bobTime += dt * 3;
+  
+  // Player movement - W/S forward/backward, A/D turn left/right
+  const speed = gameState === 'forest' ? 5 : 4;
+  let moveDir = 0;
+  let turnDir = 0;
+  
+  if (keys['w'] || keys['arrowup']) moveDir = 1;
+  if (keys['s'] || keys['arrowdown']) moveDir = -1;
+  if (keys['a'] || keys['arrowleft']) turnDir = 1;
+  if (keys['d'] || keys['arrowright']) turnDir = -1;
+  
+  // Turn the blob
+  if (turnDir !== 0) {
+    playerAngle += turnDir * 3.5 * dt;
+  }
+  
+  // Move forward/backward in player's facing direction
+  if (moveDir !== 0) {
+    const targetVx = Math.sin(playerAngle) * speed * moveDir;
+    const targetVz = Math.cos(playerAngle) * speed * moveDir;
+    playerVel.x += (targetVx - playerVel.x) * 6 * dt;
+    playerVel.z += (targetVz - playerVel.z) * 6 * dt;
+  } else {
+    playerVel.x *= (1 - 8 * dt);
+    playerVel.z *= (1 - 8 * dt);
+  }
+  
+  if (gameState === 'forest') {
+    // Free fly
+    if (keys[' ']) playerPos.y += 3 * dt;
+    else playerPos.y += (1 - playerPos.y) * dt;
+    playerPos.x += playerVel.x * dt;
+    playerPos.z += playerVel.z * dt;
+  } else {
+    // Collision with walls
+    const newX = playerPos.x + playerVel.x * dt;
+    const newZ = playerPos.z + playerVel.z * dt;
+    
+    if (!isWall(newX, playerPos.z)) playerPos.x = newX;
+    else playerVel.x = 0;
+    if (!isWall(playerPos.x, newZ)) playerPos.z = newZ;
+    else playerVel.z = 0;
+    
+    // Bouncy y
+    playerPos.y = 0.5 + Math.sin(bobTime) * 0.08 + Math.abs(Math.sin(bobTime * 2)) * 0.03;
+  }
+  
+  // Camera follow - angled overhead view
+  const camHeight = gameState === 'forest' ? 10 : 8;
+  const camDist = gameState === 'forest' ? 6 : 5;
+  const idealCam = {
+    x: playerPos.x - Math.sin(playerAngle) * camDist,
+    y: playerPos.y + camHeight,
+    z: playerPos.z - Math.cos(playerAngle) * camDist
+  };
+  cameraPos.x += (idealCam.x - cameraPos.x) * 3 * dt;
+  cameraPos.y += (idealCam.y - cameraPos.y) * 3 * dt;
+  cameraPos.z += (idealCam.z - cameraPos.z) * 3 * dt;
+  cameraTarget.x = playerPos.x;
+  cameraTarget.y = playerPos.y;
+  cameraTarget.z = playerPos.z;
+  
+  if (gameState !== 'playing') return;
+  
+  // Update moving walls
+  const t = performance.now() / 1000;
+  for (const mw of movingWalls) {
+    if (mw.dir === 'x') {
+      mw.x = mw.origX + Math.sin(t * 0.8 + mw.phase) * mw.amplitude;
+    } else {
+      mw.z = mw.origZ + Math.sin(t * 0.8 + mw.phase) * mw.amplitude;
+    }
+  }
+  
+  // Update monsters
+  for (const m of monsters) {
+    const dx = playerPos.x - m.x;
+    const dz = playerPos.z - m.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    
+    if (dist < 5) {
+      m.chasing = true;
+    } else if (dist > 10) {
+      m.chasing = false;
+    }
+    
+    if (m.chasing) {
+      m.vx += (dx / dist * m.speed - m.vx) * 3 * dt;
+      m.vz += (dz / dist * m.speed - m.vz) * 3 * dt;
+    } else {
+      m.patrolTimer -= dt;
+      if (m.patrolTimer <= 0) {
+        m.vx = (Math.random() - 0.5) * m.speed;
+        m.vz = (Math.random() - 0.5) * m.speed;
+        m.patrolTimer = 2 + Math.random() * 3;
+      }
+    }
+    
+    const nmx = m.x + m.vx * dt;
+    const nmz = m.z + m.vz * dt;
+    if (!isWall(nmx, m.z)) m.x = nmx; else m.vx *= -1;
+    if (!isWall(m.x, nmz)) m.z = nmz; else m.vz *= -1;
+    
+    m.y = 0.4 + Math.sin(t * 3 + m.phase) * 0.1;
+    
+    // Hit player
+    if (dist < 0.8) {
+      playHit();
+      // Respawn player at start
+      playerPos.x = 1 * CELL;
+      playerPos.z = 1 * CELL;
+      playerVel.x = 0;
+      playerVel.z = 0;
+    }
+  }
+  
+  // Check exit
+  const eDist = Math.hypot(playerPos.x - exitPos.x, playerPos.z - exitPos.z);
+  if (currentLevel === 2 && eDist < 4) exitFound = true;
+  
+  if (eDist < 1.2) {
+    playCollect();
+    gameState = 'transition';
+    const titles = ['Level 1 Complete!', 'Level 2 Complete!', 'All Levels Complete!'];
+    const subs = ['The maze grows darker...', 'One more challenge awaits...', 'You\'ve conquered the maze!'];
+    document.getElementById('transition-title').textContent = titles[currentLevel];
+    document.getElementById('transition-sub').textContent = subs[currentLevel];
+    document.getElementById('level-transition').style.display = 'flex';
+  }
+  
+  // Update particles
+  for (const p of particles) {
+    p.y += Math.sin(t + p.phase) * 0.002;
+    p.x += Math.sin(t * 0.5 + p.phase) * 0.005;
+  }
+}
+
+// ===== RENDER =====
+function render() {
+  canvas.width = canvas.clientWidth * (window.devicePixelRatio > 1.5 ? 1.5 : window.devicePixelRatio || 1);
+  canvas.height = canvas.clientHeight * (window.devicePixelRatio > 1.5 ? 1.5 : window.devicePixelRatio || 1);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  
+  const isForest = gameState === 'forest';
+  const fogCol = isForest ? [0.05, 0.15, 0.08] : [0.03, 0.03, 0.08];
+  gl.clearColor(fogCol[0], fogCol[1], fogCol[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  
+  if (gameState === 'title') return;
+  
+  const aspect = canvas.width / canvas.height;
+  const proj = mat4Perspective(1.0, aspect, 0.1, 100);
+  const view = mat4LookAt(
+    [cameraPos.x, cameraPos.y, cameraPos.z],
+    [cameraTarget.x, cameraTarget.y, cameraTarget.z],
+    [0, 1, 0]
+  );
+  
+  gl.uniformMatrix4fv(uProj, false, proj);
+  gl.uniformMatrix4fv(uView, false, view);
+  gl.uniform3f(uPlayerPos, playerPos.x, playerPos.y + 0.5, playerPos.z);
+  gl.uniform3f(uFogColor, fogCol[0], fogCol[1], fogCol[2]);
+  gl.uniform3f(uTorchColor, 1.0, 0.85, 0.5);
+  
+  if (isForest) {
+    gl.uniform1f(uAmbient, 0.35);
+    gl.uniform1f(uFogDensity, 0.008);
+    renderForest();
+  } else if (levelData) {
+    gl.uniform1f(uAmbient, levelData.cfg.ambientLight);
+    gl.uniform1f(uFogDensity, levelData.cfg.fogDensity);
+    renderLevel();
+  }
+  
+  // Always render player
+  renderPlayer();
+}
+
+function renderLevel() {
+  const { grid, gw, gh } = levelData;
+  const t = performance.now() / 1000;
+  
+  // Render distance culling
+  const renderDist = currentLevel === 0 ? 30 : 22;
+  
+  // Floor
+  for (let z = 0; z < gh; z++) {
+    for (let x = 0; x < gw; x++) {
+      if (grid[z][x] === 1) {
+        const wx = x * CELL, wz = z * CELL;
+        if (Math.hypot(wx - playerPos.x, wz - playerPos.z) > renderDist) continue;
+        drawMesh(floorTile, mat4Translate(wx, -0.075, wz));
+      }
+    }
+  }
+  
+  // Static walls
+  for (let z = 0; z < gh; z++) {
+    for (let x = 0; x < gw; x++) {
+      if (grid[z][x] === 0) {
+        const wx = x * CELL, wz = z * CELL;
+        if (Math.hypot(wx - playerPos.x, wz - playerPos.z) > renderDist) continue;
+        const mesh = (x + z) % 3 === 0 ? wallMeshDark : wallMesh;
+        drawMesh(mesh, mat4Translate(wx, WALL_H/2, wz));
+      }
+    }
+  }
+  
+  // Moving walls
+  for (const mw of movingWalls) {
+    drawMesh(wallMesh, mat4Translate(mw.x, WALL_H/2, mw.z));
+  }
+  
+  // Exit
+  if (exitFound) {
+    const glow = 1.0 + Math.sin(t * 3) * 0.3;
+    drawMesh(exitMesh, mat4Mul(mat4Translate(exitPos.x, 0.8 + Math.sin(t*2)*0.2, exitPos.z), mat4Scale(glow, glow, glow)));
+  }
+  
+  // Monsters
+  for (const m of monsters) {
+    const scale = m.chasing ? 1.1 + Math.sin(t*8)*0.1 : 1.0;
+    drawMesh(monsterMesh, mat4Mul(mat4Translate(m.x, m.y, m.z), mat4Scale(scale, scale, scale)));
+    // Eyes (small white dots)
+    const eyeMesh = makeSphere(0.06, 4, 1.0, 1.0, 0.8);
+    drawMesh(eyeMesh, mat4Translate(m.x + 0.15, m.y + 0.15, m.z + 0.3));
+    drawMesh(eyeMesh, mat4Translate(m.x - 0.15, m.y + 0.15, m.z + 0.3));
+  }
+  
+  // Particles
+  for (const p of particles) {
+    if (Math.hypot(p.x - playerPos.x, p.z - playerPos.z) > 15) continue;
+    drawMesh(particleMesh, mat4Mul(mat4Translate(p.x, p.y, p.z), mat4Scale(p.size*10, p.size*10, p.size*10)));
+  }
+}
+
+function renderPlayer() {
+  const squish = Math.sin(bobTime * 2) * 0.5 + 0.5;
+  const blobMesh = makeBlobMesh(squish);
+  drawMesh(blobMesh, mat4Translate(playerPos.x, playerPos.y, playerPos.z));
+  
+  // Torch
+  const torchOffX = Math.sin(playerAngle + 0.8) * 0.4;
+  const torchOffZ = Math.cos(playerAngle + 0.8) * 0.4;
+  const torchY = playerPos.y + 0.3;
+  drawMesh(torchStick, mat4Translate(playerPos.x + torchOffX, torchY, playerPos.z + torchOffZ));
+  
+  const flicker = 1.0 + Math.sin(performance.now()/100) * 0.15;
+  drawMesh(torchMesh, mat4Mul(
+    mat4Translate(playerPos.x + torchOffX, torchY + 0.25, playerPos.z + torchOffZ),
+    mat4Scale(flicker, flicker, flicker)
+  ));
+  
+  // Wings in forest
+  if (hasWings) {
+    const wingFlap = Math.sin(performance.now()/200) * 0.3;
+    const wingMesh = makeSphere(0.2, 5, 0.8, 0.9, 1.0);
+    drawMesh(wingMesh, mat4Mul(
+      mat4Translate(playerPos.x - 0.4, playerPos.y + 0.3 + wingFlap, playerPos.z),
+      mat4Scale(1.5, 0.5, 1.0)
+    ));
+    drawMesh(wingMesh, mat4Mul(
+      mat4Translate(playerPos.x + 0.4, playerPos.y + 0.3 + wingFlap, playerPos.z),
+      mat4Scale(1.5, 0.5, 1.0)
+    ));
+  }
+}
+
+function renderForest() {
+  const t = performance.now() / 1000;
+  
+  // Ground
+  const groundMesh = makeBox(60, 0.2, 60, 0.1, 0.25, 0.1);
+  drawMesh(groundMesh, mat4Translate(0, -0.1, 0));
+  
+  // Trees
+  const treePositions = [];
+  for (let i = 0; i < 20; i++) {
+    const angle = (i / 20) * Math.PI * 2;
+    const dist = 6 + Math.sin(i * 3.7) * 4;
+    treePositions.push({ x: Math.cos(angle) * dist, z: Math.sin(angle) * dist });
+  }
+  
+  for (const tp of treePositions) {
+    drawMesh(treeTrunk, mat4Translate(tp.x, 1, tp.z));
+    const leafScale = 1.0 + Math.sin(t + tp.x) * 0.1;
+    drawMesh(treeLeaves, mat4Mul(mat4Translate(tp.x, 2.5, tp.z), mat4Scale(leafScale, leafScale, leafScale)));
+  }
+  
+  // Glowing plants
+  for (let i = 0; i < 15; i++) {
+    const angle = (i / 15) * Math.PI * 2 + 0.5;
+    const dist = 3 + Math.sin(i * 2.3) * 2;
+    const gx = Math.cos(angle) * dist;
+    const gz = Math.sin(angle) * dist;
+    const pulse = 1.0 + Math.sin(t * 2 + i) * 0.3;
+    drawMesh(glowPlant, mat4Mul(mat4Translate(gx, 0.3, gz), mat4Scale(pulse, pulse, pulse)));
+  }
+  
+  // Forest particles
+  for (const fp of forestParticles) {
+    fp.y += Math.sin(t + fp.phase) * 0.003;
+    const s = fp.size * 10;
+    const pm = makeSphere(0.05, 4, fp.color[0], fp.color[1], fp.color[2]);
+    drawMesh(pm, mat4Mul(mat4Translate(fp.x, fp.y, fp.z), mat4Scale(s, s, s)));
+  }
+}
+
+// ===== INPUT =====
+document.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  e.preventDefault();
+});
+document.addEventListener('keyup', e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+// ===== GAME LOOP =====
+function gameLoop(time) {
+  const dt = Math.min((time - (lastTime || time)) / 1000, 0.05);
+  lastTime = time;
+  
+  update(dt);
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9f1f3b0096e2de95',t:'MTc3NzEzOTg1MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
